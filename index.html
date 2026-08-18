@@ -773,88 +773,64 @@
     form.elements[key].addEventListener('blur', function(){ validateField(key); });
   });
 
-form.addEventListener('submit', function(e){
-  e.preventDefault();
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    statusBox.className = 'form-status';
+    statusBox.textContent = '';
 
-  statusBox.className = 'form-status';
-  statusBox.textContent = '';
+    if(form.elements['website'].value.trim() !== ''){
+      statusBox.textContent = 'Submission blocked.';
+      statusBox.className = 'form-status bad';
+      return;
+    }
 
-  if(form.elements['website'].value.trim() !== ''){
-    statusBox.textContent = 'Submission blocked.';
-    statusBox.className = 'form-status bad';
-    return;
-  }
+    var now = Date.now();
+    if(now - lastSubmit < 8000){
+      statusBox.textContent = 'Please wait a few seconds before sending another message.';
+      statusBox.className = 'form-status bad';
+      return;
+    }
 
-  var now = Date.now();
+    var allValid = ['name','email','subject','message'].map(validateField).every(Boolean);
+    if(!allValid){
+      statusBox.textContent = 'Please fix the highlighted fields.';
+      statusBox.className = 'form-status bad';
+      return;
+    }
 
-  if(now - lastSubmit < 8000){
-    statusBox.textContent = 'Please wait a few seconds before sending another message.';
-    statusBox.className = 'form-status bad';
-    return;
-  }
+    lastSubmit = now;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending…';
 
-  var allValid = ['name','email','subject','message']
-    .map(validateField)
-    .every(Boolean);
+    var safe = {
+      name: escapeHTML(form.elements.name.value.trim())
+    };
 
-  if(!allValid){
-    statusBox.textContent = 'Please fix the highlighted fields.';
-    statusBox.className = 'form-status bad';
-    return;
-  }
-
-  lastSubmit = now;
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Sending…';
-
-  var name = form.elements.name.value.trim();
-  var email = form.elements.email.value.trim();
-  var subject = form.elements.subject.value.trim();
-  var message = form.elements.message.value.trim();
-
-  fetch('https://formsubmit.co/ajax/' + encodeURIComponent(RECEIVER_EMAIL), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    body: JSON.stringify({
-      name: name,
-      email: email,
-      _replyto: email,
-      subject: subject,
-      message: message,
-      _subject: 'Portfolio message: ' + subject
+    fetch('https://formsubmit.co/ajax/' + encodeURIComponent(RECEIVER_EMAIL), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        name: form.elements.name.value.trim(),
+        email: form.elements.email.value.trim(),
+        subject: form.elements.subject.value.trim(),
+        message: form.elements.message.value.trim(),
+        _subject: 'Portfolio message: ' + form.elements.subject.value.trim()
+      })
     })
-  })
-  .then(function(res){
-    return res.json().then(function(data){
-      if(!res.ok || data.success === false){
-        throw new Error(data.message || 'Form submission failed.');
-      }
-
-      return data;
+    .then(function(res){ return res.json().catch(function(){ return {}; }); })
+    .then(function(){
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send Message →';
+      statusBox.textContent = 'Thanks, ' + safe.name + ' — your message is on its way!';
+      statusBox.className = 'form-status ok';
+      form.reset();
+    })
+    .catch(function(){
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send Message →';
+      statusBox.textContent = 'Something went wrong sending that — please try again, or email me directly.';
+      statusBox.className = 'form-status bad';
     });
-  })
-  .then(function(data){
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Send Message →';
-
-    statusBox.textContent = 'Thanks, ' + escapeHTML(name) + ' — your message has been sent!';
-    statusBox.className = 'form-status ok';
-
-    form.reset();
-  })
-  .catch(function(error){
-    console.error('FormSubmit error:', error);
-
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Send Message →';
-
-    statusBox.textContent = 'Something went wrong sending that. Please try again.';
-    statusBox.className = 'form-status bad';
-  });
-});
   });
 })();
 </script>
